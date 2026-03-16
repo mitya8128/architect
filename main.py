@@ -1,28 +1,80 @@
 from architecture.loader import load_architecture
 from verifier.verifier import verify_architecture
-from llm import LLMClient, generate_architecture
+from llm import LLMClient
 from system_prompt import SYSTEM_PROMPT
 from prompts.code_generation_prompts import PYTHON_PROMPT
 from prompts.rebuild_arch_prompts import build_repair_prompt
 
 
-llm = LLMClient()
+ARCH_PATH = "sessions/architecture.yaml"
+CODE_PATH = "sessions/generated_code.py"
 
-USER_PROMPT = ''
+MAX_ATTEMPTS = 6
 
-# generate_architecture(SYSTEM_PROMPT, USER_PROMPT, 'session/architecture.yaml')
-arch = load_architecture("sessions/architecture.yaml")
 
-errors = verify_architecture(arch)
+def generate_architecture_loop(llm, user_prompt):
 
-if errors:
-    print("Verification failed")
-    for e in errors:
-        print(e)
-    prompt_edited = build_repair_prompt(SYSTEM_PROMPT, errors)
-    # re-generate arch
-    llm.generate(prompt_edited, USER_PROMPT)
-else:
-    print("Architecture is valid")
-    llm.generate_code_from_architecture("sessions/architecture.yaml", 
-                                        "sessions/generated_code.py")
+    prompt = user_prompt
+
+    for attempt in range(MAX_ATTEMPTS):
+
+        print(f"\n=== Architecture generation attempt {attempt+1} ===")
+
+        response = llm.generate(SYSTEM_PROMPT, prompt)
+
+        with open(ARCH_PATH, "w") as f:
+            f.write(response)
+
+        try:
+            arch = load_architecture(ARCH_PATH)
+        except Exception as e:
+            print("YAML parsing error:", e)
+            prompt = build_repair_prompt(prompt, [str(e)])
+            continue
+
+        errors = verify_architecture(arch)
+
+        if not errors:
+            print("Architecture verified successfully")
+            return arch
+
+        print("Verification errors:")
+        for e in errors:
+            print("-", e)
+
+        prompt = build_repair_prompt(prompt, errors)
+
+    raise RuntimeError("Failed to generate valid architecture")
+
+
+def generate_code(llm):
+
+    with open(ARCH_PATH) as f:
+        arch_text = f.read()
+
+    prompt = PYTHON_PROMPT.format(architecture=arch_text)
+
+    code = llm.generate("", prompt)
+
+    with open(CODE_PATH, "w") as f:
+        f.write(code)
+
+    print("Code generated:", CODE_PATH)
+
+
+def main():
+
+    llm = LLMClient()
+
+    USER_PROMPT = """
+Design a simple calendar web application backend.
+Users should be able to create events and view a calendar.
+"""
+
+    arch = generate_architecture_loop(llm, USER_PROMPT)
+
+    llm.generate_code_from_architecture(ARCH_PATH, CODE_PATH)
+
+
+if __name__ == "__main__":
+    main()
