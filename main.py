@@ -4,6 +4,7 @@ from llm import LLMClient
 from system_prompt import SYSTEM_PROMPT
 from prompts.code_generation_prompts import PYTHON_PROMPT
 from prompts.rebuild_arch_prompts import build_repair_prompt
+from utils.yaml_utils import extract_yaml, normalize_yaml
 
 
 ARCH_PATH = "sessions/architecture.yaml"
@@ -22,8 +23,17 @@ def generate_architecture_loop(llm, user_prompt):
 
         response = llm.generate(SYSTEM_PROMPT, prompt)
 
+        yaml_text = extract_yaml(response)
+
+        try:
+            yaml_text = normalize_yaml(yaml_text)
+        except Exception as e:
+            print("YAML normalization failed:", e)
+            prompt = build_repair_prompt(prompt, [str(e)])
+            continue
+
         with open(ARCH_PATH, "w") as f:
-            f.write(response)
+            f.write(yaml_text)
 
         try:
             arch = load_architecture(ARCH_PATH)
