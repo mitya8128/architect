@@ -153,8 +153,6 @@ The system includes an AST-based verifier:
 
 ## 📍 Roadmap
 
-### ближайшие шаги
-
 * [ ] CLI interface (argparse)
 * [ ] multi-model abstraction layer
 * [ ] AST-level code verification
