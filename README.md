@@ -103,7 +103,7 @@ The verifier ensures:
 ### Run the system
 
 ```bash
-python main.py
+python main.py  -h
 ```
 
 This will:
@@ -154,6 +154,7 @@ The system includes an AST-based verifier:
 ## 📍 Roadmap
 
 * [ ] CLI interface (argparse)
+* [ ] logs of all erros during architecture generation step to feed into model  
 * [ ] multi-model abstraction layer
 * [ ] AST-level code verification
 * [ ] architecture → tests (TDD loop)

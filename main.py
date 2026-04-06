@@ -1,23 +1,22 @@
+import argparse
+
 from architecture.loader import load_architecture
 from verifier.verifier import verify_architecture
 from llm import LLMClient
 from system_prompt import SYSTEM_PROMPT
-from prompts.code_generation_prompts import PYTHON_PROMPT
 from prompts.rebuild_arch_prompts import build_repair_prompt
 from utils.yaml_utils import extract_yaml, normalize_yaml
 
 
-ARCH_PATH = "sessions/architecture.yaml"
-CODE_PATH = "sessions/generated_code.py"
-
-MAX_ATTEMPTS = 6
+DEFAULT_ARCH_PATH = "sessions/architecture.yaml"
+DEFAULT_CODE_PATH = "sessions/generated_code.py"
 
 
-def generate_architecture_loop(llm, user_prompt):
+def generate_architecture_loop(llm, user_prompt, arch_path, max_attempts):
 
     prompt = user_prompt
 
-    for attempt in range(MAX_ATTEMPTS):
+    for attempt in range(max_attempts):
 
         print(f"\n=== Architecture generation attempt {attempt+1} ===")
 
@@ -32,11 +31,11 @@ def generate_architecture_loop(llm, user_prompt):
             prompt = build_repair_prompt(prompt, [str(e)])
             continue
 
-        with open(ARCH_PATH, "w") as f:
+        with open(arch_path, "w") as f:
             f.write(yaml_text)
 
         try:
-            arch = load_architecture(ARCH_PATH)
+            arch = load_architecture(arch_path)
         except Exception as e:
             print("YAML parsing error:", e)
             prompt = build_repair_prompt(prompt, [str(e)])
@@ -57,33 +56,71 @@ def generate_architecture_loop(llm, user_prompt):
     raise RuntimeError("Failed to generate valid architecture")
 
 
-def generate_code(llm):
+def generate_code(llm, arch_path, code_path):
 
-    with open(ARCH_PATH) as f:
-        arch_text = f.read()
-
-    prompt = PYTHON_PROMPT.format(architecture=arch_text)
-
-    code = llm.generate("", prompt)
-
-    with open(CODE_PATH, "w") as f:
-        f.write(code)
-
-    print("Code generated:", CODE_PATH)
+    llm.generate_code_from_architecture(arch_path, code_path)
 
 
 def main():
 
-    llm = LLMClient()
+    parser = argparse.ArgumentParser(
+        description="AI Architecture Compiler CLI"
+    )
 
-    USER_PROMPT = """
-Design a simple calendar web application backend.
-Users should be able to create events and view a calendar.
-"""
+    parser.add_argument(
+        "--prompt",
+        type=str,
+        required=True,
+        help="User prompt describing the system"
+    )
 
-    arch = generate_architecture_loop(llm, USER_PROMPT)
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="gemma3:latest",
+        help="LLM model name (ollama)"
+    )
 
-    llm.generate_code_from_architecture(ARCH_PATH, CODE_PATH)
+    parser.add_argument(
+        "--arch",
+        type=str,
+        default=DEFAULT_ARCH_PATH,
+        help="Path to save architecture YAML"
+    )
+
+    parser.add_argument(
+        "--code",
+        type=str,
+        default=DEFAULT_CODE_PATH,
+        help="Path to save generated code"
+    )
+
+    parser.add_argument(
+        "--no-code",
+        action="store_true",
+        help="Skip code generation"
+    )
+
+    parser.add_argument(
+        "--max-attempts",
+        type = int,
+        default=6,
+        help = "number of generation attempts"
+    )
+
+    args = parser.parse_args()
+
+    llm = LLMClient(model=args.model)
+
+    arch = generate_architecture_loop(
+        llm,
+        args.prompt,
+        args.arch,
+        args.max_attempts
+    )
+
+    if not args.no_code:
+        generate_code(llm, arch, args.code)
 
 
 if __name__ == "__main__":
