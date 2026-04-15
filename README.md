@@ -103,7 +103,13 @@ The verifier ensures:
 ### Run the system
 
 ```bash
-python main.py  -h
+python main.py  -h  
+
+example with ollama:
+python main.py \
+  --provider ollama \
+  --model deepseek-r1 \
+  --prompt "calendar backend"
 ```
 
 This will:
