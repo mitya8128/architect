@@ -16,6 +16,9 @@ def generate_architecture_loop(llm, user_prompt, arch_path, max_attempts):
 
     prompt = user_prompt
 
+    best_arch = None
+    best_errors = None
+
     for attempt in range(max_attempts):
 
         print(f"\n=== Architecture generation attempt {attempt+1} ===")
@@ -43,6 +46,10 @@ def generate_architecture_loop(llm, user_prompt, arch_path, max_attempts):
 
         errors = verify_architecture(arch)
 
+        if best_errors is None or len(errors) < len(best_errors):
+            best_arch = arch
+            best_errors = errors
+
         if not errors:
             print("Architecture verified successfully")
             return arch
@@ -53,7 +60,19 @@ def generate_architecture_loop(llm, user_prompt, arch_path, max_attempts):
 
         prompt = build_repair_prompt(prompt, errors)
 
-    raise RuntimeError("Failed to generate valid architecture")
+    print("\n⚠️ Max attempts reached")
+
+    if best_arch is not None:
+        print(f"Using best candidate with {len(best_errors)} errors")
+
+        with open(arch_path, "w") as f:
+            f.write(normalize_yaml(extract_yaml(
+                llm.generate(SYSTEM_PROMPT, user_prompt)
+            )))
+
+        return best_arch
+
+    raise RuntimeError("Failed to generate any architecture")
 
 
 def generate_code(llm, arch_path, code_path):
@@ -120,7 +139,7 @@ def main():
     )
 
     if not args.no_code:
-        generate_code(llm, arch, args.code)
+        generate_code(llm, args.arch, args.code)
 
 
 if __name__ == "__main__":

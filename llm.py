@@ -42,7 +42,27 @@ class LLMClient:
         except Exception as e:
             raise IOError(f"Error reading YAML file: {e}")
 
-        user_prompt = self.PYTHON_PROMPT.replace('{{architecture_yaml}}', architecture_yaml)
+
+        user_prompt = f"""Generate python code using specification: {architecture_yaml}
+            The system consists of:
+
+            * TYPES (data structures)
+            * MODULES (pure transformations between types)
+            * PIPELINES (composition of modules)
+
+            Each module must behave like a function:
+
+            module : InputType → OutputType
+
+            Rules:
+
+            1. Every module must declare exactly one input type and one output type.
+            2. All types must be declared in the "types" section.
+            3. Pipelines are ordered lists of modules.
+            4. The output type of module N must equal the input type of module N+1.
+            5. Avoid cycles.
+            6. Keep the system minimal but complete.
+            """
         code = self.generate("", user_prompt)
 
         with open(py_file_path, "w") as f:
