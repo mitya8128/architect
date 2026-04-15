@@ -2,7 +2,7 @@ import argparse
 
 from architecture.loader import load_architecture
 from verifier.verifier import verify_architecture
-from llm import LLMClient
+from llm.factory import get_llm
 from system_prompt import SYSTEM_PROMPT
 from prompts.rebuild_arch_prompts import build_repair_prompt
 from utils.yaml_utils import extract_yaml, normalize_yaml
@@ -101,6 +101,13 @@ def main():
     )
 
     parser.add_argument(
+    "--provider",
+    type=str,
+    default="ollama",
+    help="LLM provider: ollama | openai | claude "
+)
+
+    parser.add_argument(
         "--arch",
         type=str,
         default=DEFAULT_ARCH_PATH,
@@ -129,7 +136,7 @@ def main():
 
     args = parser.parse_args()
 
-    llm = LLMClient(model=args.model)
+    llm = get_llm(args.provider, args.model)
 
     arch = generate_architecture_loop(
         llm,
