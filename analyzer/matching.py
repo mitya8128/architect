@@ -62,3 +62,62 @@ def check_composition(graph, functions):
                 )
 
     return errors
+
+
+def check_cycles(graph):
+
+    visited = set()
+    stack = set()
+
+    def dfs(node):
+
+        if node in stack:
+            return True
+
+        if node in visited:
+            return False
+
+        visited.add(node)
+        stack.add(node)
+
+        for neighbor in graph[node]:
+            if neighbor in graph and dfs(neighbor):
+                return True
+
+        stack.remove(node)
+        return False
+
+    for node in graph:
+        if dfs(node):
+            return ["Cycle detected"]
+
+    return []
+
+
+def check_unused_functions(graph):
+
+    called = set()
+
+    for callees in graph.values():
+        called.update(callees)
+
+    unused = set(graph.keys()) - called
+
+    # исключаем entry points (например, main)
+    unused = [f for f in unused if f != "main"]
+
+    return [f"Unused function: {f}" for f in unused]
+
+
+def check_missing_functions(graph):
+
+    errors = []
+
+    all_funcs = set(graph.keys())
+
+    for caller, callees in graph.items():
+        for callee in callees:
+            if callee not in all_funcs:
+                errors.append(f"{caller} calls unknown function {callee}")
+
+    return errors
