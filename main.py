@@ -3,6 +3,7 @@ import argparse
 from architecture.loader import load_architecture
 from verifier.verifier import verify_architecture
 from llm.factory import get_llm
+from llm.services.code_generator import CodeGenerator
 from system_prompt import SYSTEM_PROMPT
 from prompts.rebuild_arch_prompts import build_repair_prompt
 from utils.yaml_utils import extract_yaml, normalize_yaml
@@ -146,7 +147,10 @@ def main():
     )
 
     if not args.no_code:
-        generate_code(llm, args.arch, args.code)
+        # generate_code(llm, args.arch, args.code)
+
+        generator = CodeGenerator(llm)
+        generator.generate_from_architecture(args.arch, args.code)
 
 
 if __name__ == "__main__":
