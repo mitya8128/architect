@@ -13,24 +13,26 @@ def extract_yaml(text: str) -> str:
 
     # remove think tags
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
-
-    # case 1 — markdown yaml block
+    
+    # case 1: markdown yaml block
     fenced = re.findall(r"```yaml(.*?)```", text, flags=re.DOTALL)
-
     if fenced:
         return fenced[0].strip()
-
-    # case 2 — any fenced block
+    
+    # case 2: any fenced block
     fenced_any = re.findall(r"```(.*?)```", text, flags=re.DOTALL)
-
     if fenced_any:
         return fenced_any[0].strip()
-
-    # case 3 — fallback: find start of architecture
+    
+    # case 3: fallback: find start of architecture
     idx = text.find("system:")
-
     if idx != -1:
-        return text[idx:].strip()
+        text = text[idx:]
+
+    # case 4: cut any possible garbage after YAML
+    end = text.find("\n\n")
+    if end != -1:
+        text = text[:end]
 
     return text.strip()
 

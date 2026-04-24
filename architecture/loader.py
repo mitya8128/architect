@@ -7,6 +7,16 @@ def load_architecture(path: str) -> Architecture:
     with open(path) as f:
         data = yaml.safe_load(f)
 
+    # support for list И dict
+    raw_types = data["types"]
+
+    if isinstance(raw_types, list):
+        types = set(raw_types)
+    elif isinstance(raw_types, dict):
+        types = set(raw_types.keys())
+    else:
+        raise ValueError("Invalid types format")
+
     modules = {
         name: Module(
             name=name,
@@ -24,7 +34,7 @@ def load_architecture(path: str) -> Architecture:
 
     return Architecture(
         name=data["system"]["name"],
-        types=data["types"],
+        types=types,
         modules=modules,
         pipelines=pipelines
     )
