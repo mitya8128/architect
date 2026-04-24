@@ -1,5 +1,6 @@
 import argparse
 
+from analyzer.main_pipeline import analyze_code
 from architecture.loader import load_architecture
 from verifier.verifier import verify_architecture
 from llm.factory import get_llm
@@ -18,6 +19,37 @@ def safe_normalize_yaml(text: str) -> str:
         return normalize_yaml(text)
     except Exception:
         return text
+
+
+def analyze_generated_code(arch_path, code_path):
+
+    print("\n=== Running Code Analyzer ===")
+
+    try:
+        with open(code_path) as f:
+            code = f.read()
+
+        arch = load_architecture(arch_path)
+
+        result = analyze_code(code, arch)
+
+        print("\n=== ANALYSIS RESULT ===")
+        print("Score:", result.get("score"))
+
+        print("\nErrors:")
+        for e in result.get("errors", []):
+            print("-", e)
+
+        print("\nWarnings:")
+        for w in result.get("warnings", []):
+            print("-", w)
+
+        print("\nMetrics:")
+        for k, v in result.get("metrics", {}).items():
+            print(f"{k}: {v}")
+
+    except Exception as e:
+        print("Analyzer failed:", e)
 
 
 def generate_architecture_loop(llm, user_prompt, arch_path, max_attempts):
@@ -92,6 +124,8 @@ def main():
 
     parser.add_argument("--no-code", action="store_true")
 
+    parser.add_argument("--no-analyze", action="store_true", help="Skip code analysis step")
+
     parser.add_argument("--max-attempts", type=int, default=6)
 
     args = parser.parse_args()
@@ -108,6 +142,9 @@ def main():
     if not args.no_code:
         generator = CodeGenerator(llm)
         generator.generate_from_architecture(args.arch, args.code)
+
+        if not args.no_analyze:
+            analyze_generated_code(args.arch, args.code)
 
 
 if __name__ == "__main__":
