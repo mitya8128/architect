@@ -1,9 +1,9 @@
 import ast
-from parser import extract_functions, extract_types, extract_calls, build_call_graph
-from side_effects import detect_side_effects
-from matching import check_composition, check_cycles, check_pipeline_vs_graph, check_unused_functions, \
+from .parser import extract_functions, extract_types, extract_calls, build_call_graph
+from .side_effects import detect_side_effects
+from .matching import check_composition, check_cycles, check_pipeline_vs_graph, check_unused_functions, \
 check_missing_functions
-from code_metrics import detect_high_coupling, detect_large_functions, detect_dangerous_calls, \
+from .code_metrics import detect_high_coupling, detect_large_functions, detect_dangerous_calls, \
 compute_score
 
 
@@ -32,18 +32,18 @@ def analyze_code(code: str, arch=None):
     warnings += detect_dangerous_calls(calls)
 
     # arch matching
-    if arch is not None:
-        arch_errors, arch_warnings = check_pipeline_vs_graph(
-            arch, functions, graph
-        )
-        errors += arch_errors
-        warnings += arch_warnings
+    # if arch is not None:
+    #     arch_errors, arch_warnings = check_pipeline_vs_graph(
+    #         arch, graph
+    #     )
+    #     errors += arch_errors
+    #     warnings += arch_warnings
 
     # metrics
     metrics = {
         "num_functions": len(functions),
         "num_edges": sum(len(v) for v in graph.values()),
-        "num_types": len(types),
+        # "num_types": len(types),
         "num_side_effects": len(side_effects),
         "num_errors": len(errors),
         "num_warnings": len(warnings),
@@ -54,7 +54,7 @@ def analyze_code(code: str, arch=None):
     return {
         "functions": functions,
         "graph": graph,
-        "types": list(types),
+        # "types": list(types),
         "side_effects": side_effects,
         "metrics": metrics,
         "errors": errors,
