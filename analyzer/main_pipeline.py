@@ -43,7 +43,7 @@ def analyze_code(code: str, arch=None):
     metrics = {
         "num_functions": len(functions),
         "num_edges": sum(len(v) for v in graph.values()),
-        # "num_types": len(types),
+        "num_types": len(types),
         "num_side_effects": len(side_effects),
         "num_errors": len(errors),
         "num_warnings": len(warnings),
@@ -54,7 +54,7 @@ def analyze_code(code: str, arch=None):
     return {
         "functions": functions,
         "graph": graph,
-        # "types": list(types),
+        "types": list(types),
         "side_effects": side_effects,
         "metrics": metrics,
         "errors": errors,

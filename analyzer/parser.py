@@ -92,7 +92,7 @@ def extract_types(tree):
             if node.returns:
                 types.add(ast.unparse(node.returns))
 
-    return 
+    return types
 
 
 def extract_calls(code: str):
