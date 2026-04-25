@@ -13,7 +13,7 @@ Instead of directly generating code from prompts, the system introduces an inter
 
 ## 🧠 Core Idea
 
-Traditional approach:
+"Traditional" approach:
 
 ```
 prompt → code
@@ -32,30 +32,45 @@ This enables **more reliable, interpretable, and verifiable software generation*
 ## 📦 Project Structure
 
 ```
+analyzer/
+    code_metrics.py
+    main_pipeline.py
+    matching.py
+    parser.py
+    side_effects.py
+
 architecture/
     loader.py
     model.py
 
-verifier/
-    rules.py
-    verifier.py
-    code_verifier.py
-
-utils/
-    yaml_utils.py
+llm/
+    __init__.py
+    base.py
+    claude_client.py
+    factory.py
+    ollama_client.py
+    openai_client.py
 
 prompts/
     code_generation_prompts.py
     rebuild_arch_prompts.py
 
+utils/
+    yaml_utils.py
+
+verifier/
+    rules.py
+    verifier.py
+
 sessions/
     architecture.yaml
     generated_code.py
-
+    
+README.md
 llm.py
 main.py
-parser.py
-system_prompt.py
+requirements.txt
+system.prompt
 ```
 
 
@@ -193,7 +208,7 @@ A full **compiler pipeline for software systems**.
 
 ## 👨‍💻 Author
 
-Dmitriy Akhmediev
+Dmitriy Akhmediyev
 
 
 ## 📄 License  
