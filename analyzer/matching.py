@@ -27,6 +27,7 @@ def match_types(arch, code_types):
 def check_pipeline_vs_graph(arch, graph):
 
     errors = []
+    warnings = []
 
     for pipeline in arch.pipelines.values():
 
@@ -35,10 +36,16 @@ def check_pipeline_vs_graph(arch, graph):
             f = pipeline.modules[i]
             g = pipeline.modules[i+1]
 
-            if g not in graph.get(f, []):
-                errors.append(f"Pipeline broken: {f} -> {g}")
+            callees = graph.get(f, [])
 
-    return errors
+            if g not in callees:
+
+                if f not in graph:
+                    warnings.append(f"{f} not implemented in code")
+                else:
+                    errors.append(f"Pipeline inconsistent: {f} -> {g}")
+
+    return errors, warnings
 
 
 def check_composition(graph, functions):

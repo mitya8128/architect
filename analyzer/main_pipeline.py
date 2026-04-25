@@ -32,12 +32,12 @@ def analyze_code(code: str, arch=None):
     warnings += detect_dangerous_calls(calls)
 
     # arch matching
-    # if arch is not None:
-    #     arch_errors, arch_warnings = check_pipeline_vs_graph(
-    #         arch, graph
-    #     )
-    #     errors += arch_errors
-    #     warnings += arch_warnings
+    if arch is not None:
+        arch_errors, arch_warnings = check_pipeline_vs_graph(
+            arch, graph
+        )
+        errors += arch_errors
+        warnings += arch_warnings
 
     # metrics
     metrics = {
