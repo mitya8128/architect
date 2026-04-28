@@ -122,7 +122,7 @@ The verifier ensures:
 python main.py  -h  
 
 # full pipeline:
-python main.py --analyze-only --code app.py
+python main.py --prompt "calendar backend"
 
 # full pipeline (example with ollama):
 python main.py  --provider ollama  --model deepseek-r1 --prompt "calendar backend"  
@@ -132,6 +132,9 @@ python main.py --from-arch --arch my.yaml
 
 # analyze existing pair
 python main.py --from-arch --no-code --arch arch.yaml --code code.py
+
+# only analyze code:
+python main.py --analyze-only --code app.py
 ```
 
 This will (a full pipeline):
