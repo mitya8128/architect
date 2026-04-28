@@ -29,7 +29,12 @@ def analyze_generated_code(arch_path, code_path):
         with open(code_path) as f:
             code = f.read()
 
-        arch = load_architecture(arch_path)
+        arch = None
+        if arch_path is not None:
+            try:
+                arch = load_architecture(arch_path)
+            except Exception:
+                print("⚠️ Failed to load architecture, continuing without it")
 
         result = analyze_code(code, arch)
 
@@ -115,7 +120,7 @@ def main():
         description="AI Architecture Compiler CLI"
     )
 
-    parser.add_argument("--prompt", type=str, required=True)
+    parser.add_argument("--prompt", type=str)
     parser.add_argument("--model", type=str, default="gemma3:latest")
     parser.add_argument("--provider", type=str, default="ollama")
 
@@ -123,8 +128,13 @@ def main():
     parser.add_argument("--code", type=str, default=DEFAULT_CODE_PATH)
 
     parser.add_argument("--no-code", action="store_true")
+    parser.add_argument("--no-analyze", action="store_true")
 
-    parser.add_argument("--no-analyze", action="store_true", help="Skip code analysis step")
+    parser.add_argument("--from-arch", action="store_true",
+                        help="Skip architecture generation, use existing YAML")
+
+    parser.add_argument("--analyze-only", action="store_true",
+                        help="Analyze only code (no architecture required)")
 
     parser.add_argument("--max-attempts", type=int, default=6)
 
@@ -132,19 +142,37 @@ def main():
 
     llm = get_llm(args.provider, args.model)
 
-    arch = generate_architecture_loop(
-        llm,
-        args.prompt,
-        args.arch,
-        args.max_attempts
-    )
+    arch = None
 
+    # === MODE 3: analyze only code ===
+    if args.analyze_only:
+        analyze_generated_code(None, args.code)
+        return
+
+    # === MODE 2: use existing architecture ===
+    if args.from_arch:
+        arch = load_architecture(args.arch)
+
+    # === MODE 1: generate architecture ===
+    else:
+        if not args.prompt:
+            raise ValueError("Prompt is required unless --from-arch or --analyze-only is used")
+
+        arch = generate_architecture_loop(
+            llm,
+            args.prompt,
+            args.arch,
+            args.max_attempts
+        )
+
+    # === code generation ===
     if not args.no_code:
         generator = CodeGenerator(llm)
         generator.generate_from_architecture(args.arch, args.code)
 
-        if not args.no_analyze:
-            analyze_generated_code(args.arch, args.code)
+    # === analysis ===
+    if not args.no_analyze:
+        analyze_generated_code(args.arch, args.code)
 
 
 if __name__ == "__main__":
