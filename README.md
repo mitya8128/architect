@@ -118,22 +118,33 @@ The verifier ensures:
 ### Run the system
 
 ```bash
+# full list of arguments:
 python main.py  -h  
 
-example with ollama:
-python main.py \
-  --provider ollama \
-  --model deepseek-r1 \
-  --prompt "calendar backend"
+# full pipeline:
+python main.py --prompt "calendar backend"
+
+# full pipeline (example with ollama):
+python main.py  --provider ollama  --model deepseek-r1 --prompt "calendar backend"  
+
+# use existing architecture:
+python main.py --from-arch --arch my.yaml
+
+# analyze existing pair
+python main.py --from-arch --no-code --arch arch.yaml --code code.py
+
+# only analyze code:
+python main.py --analyze-only --code app.py
 ```
 
-This will:
+This will (a full pipeline):
 
 1. Generate architecture via LLM
 2. Normalize YAML
 3. Verify architecture
 4. Repair if needed
 5. Generate Python code
+6. Analyze generated code
 
 
 
