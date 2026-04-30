@@ -7,6 +7,7 @@ from llm.factory import get_llm
 from llm.services.code_generator import CodeGenerator
 from system_prompt import SYSTEM_PROMPT
 from prompts.rebuild_arch_prompts import build_repair_prompt
+from prompts.rebuild_code_generation_prompts import build_code_repair_prompt
 from utils.yaml_utils import extract_yaml, normalize_yaml
 
 
@@ -55,6 +56,43 @@ def analyze_generated_code(arch_path, code_path):
 
     except Exception as e:
         print("Analyzer failed:", e)
+    
+    return result
+
+
+def generate_and_refine_code(llm, arch_path, code_path, max_iters=3):
+
+    generator = CodeGenerator(llm)
+
+    # initial generation
+    generator.generate_from_architecture(arch_path, code_path)
+
+    for i in range(max_iters):
+
+        print(f"\n=== Code analysis iteration {i+1} ===")
+
+        result = analyze_generated_code(arch_path, code_path)
+
+        errors = result.get("errors", [])
+        warnings = result.get("warnings", [])
+
+        if not errors:
+            print("✅ Code passed analysis")
+            return
+
+        print(f"❌ Found {len(errors)} errors, regenerating...")
+
+        with open(code_path) as f:
+            code = f.read()
+
+        repair_prompt = build_code_repair_prompt(code, errors, warnings)
+
+        new_code = llm.generate("", repair_prompt)
+
+        with open(code_path, "w") as f:
+            f.write(new_code)
+
+    print("⚠️ Max refinement iterations reached")
 
 
 def generate_architecture_loop(llm, user_prompt, arch_path, max_attempts):
@@ -167,11 +205,10 @@ def main():
 
     # === code generation ===
     if not args.no_code:
-        generator = CodeGenerator(llm)
-        generator.generate_from_architecture(args.arch, args.code)
-
+        generate_and_refine_code(llm, args.arch, args.code,max_iters=3)
+    
     # === analysis ===
-    if not args.no_analyze:
+    elif not args.no_analyze:
         analyze_generated_code(args.arch, args.code)
 
 
