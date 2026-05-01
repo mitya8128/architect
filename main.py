@@ -1,4 +1,6 @@
 import argparse
+import ast
+import re
 
 from analyzer.main_pipeline import analyze_code
 from architecture.loader import load_architecture
@@ -7,6 +9,7 @@ from llm.factory import get_llm
 from llm.services.code_generator import CodeGenerator
 from system_prompt import SYSTEM_PROMPT
 from prompts.rebuild_arch_prompts import build_repair_prompt
+from prompts.rebuild_code_generation_prompts import build_code_repair_prompt
 from utils.yaml_utils import extract_yaml, normalize_yaml
 
 
@@ -14,6 +17,9 @@ DEFAULT_ARCH_PATH = "sessions/architecture.yaml"
 DEFAULT_CODE_PATH = "sessions/generated_code.py"
 
 
+# =========================
+# YAML SAFE NORMALIZATION
+# =========================
 def safe_normalize_yaml(text: str) -> str:
     try:
         return normalize_yaml(text)
@@ -21,6 +27,35 @@ def safe_normalize_yaml(text: str) -> str:
         return text
 
 
+# =========================
+# CODE EXTRACTION FROM LLM
+# =========================
+def extract_code(text: str) -> str:
+    fenced = re.findall(r"```python(.*?)```", text, re.DOTALL)
+    if fenced:
+        return fenced[0].strip()
+
+    fenced_any = re.findall(r"```(.*?)```", text, re.DOTALL)
+    if fenced_any:
+        return fenced_any[0].strip()
+
+    return text.strip()
+
+
+# =========================
+# SYNTAX CHECK
+# =========================
+def is_valid_python(code: str):
+    try:
+        ast.parse(code)
+        return True, ""
+    except Exception as e:
+        return False, str(e)
+
+
+# =========================
+# ANALYZER WRAPPER (SAFE)
+# =========================
 def analyze_generated_code(arch_path, code_path):
 
     print("\n=== Running Code Analyzer ===")
@@ -28,35 +63,112 @@ def analyze_generated_code(arch_path, code_path):
     try:
         with open(code_path) as f:
             code = f.read()
-
-        arch = None
-        if arch_path is not None:
-            try:
-                arch = load_architecture(arch_path)
-            except Exception:
-                print("⚠️ Failed to load architecture, continuing without it")
-
-        result = analyze_code(code, arch)
-
-        print("\n=== ANALYSIS RESULT ===")
-        print("Score:", result.get("score"))
-
-        print("\nErrors:")
-        for e in result.get("errors", []):
-            print("-", e)
-
-        print("\nWarnings:")
-        for w in result.get("warnings", []):
-            print("-", w)
-
-        print("\nMetrics:")
-        for k, v in result.get("metrics", {}).items():
-            print(f"{k}: {v}")
-
     except Exception as e:
-        print("Analyzer failed:", e)
+        print("Failed to read code:", e)
+        return {
+            "errors": [f"Failed to read code: {e}"],
+            "warnings": [],
+            "metrics": {},
+            "score": 0
+        }
+
+    arch = None
+    if arch_path is not None:
+        try:
+            arch = load_architecture(arch_path)
+        except Exception:
+            print("⚠️ Failed to load architecture, continuing without it")
+
+    # ---- SYNTAX CHECK FIRST ----
+    valid, syntax_error = is_valid_python(code)
+
+    if not valid:
+        print("❌ Syntax error detected")
+
+        result = {
+            "errors": [f"Syntax error: {syntax_error}"],
+            "warnings": [],
+            "metrics": {},
+            "score": 0
+        }
+
+    else:
+        try:
+            result = analyze_code(code, arch)
+        except Exception as e:
+            print("Analyzer failed:", e)
+
+            result = {
+                "errors": [f"Analyzer error: {e}"],
+                "warnings": [],
+                "metrics": {},
+                "score": 0
+            }
+
+    # ---- PRINT RESULT ----
+    print("\n=== ANALYSIS RESULT ===")
+    print("Score:", result.get("score"))
+
+    print("\nErrors:")
+    for e in result.get("errors", []):
+        print("-", e)
+
+    print("\nWarnings:")
+    for w in result.get("warnings", []):
+        print("-", w)
+
+    print("\nMetrics:")
+    for k, v in result.get("metrics", {}).items():
+        print(f"{k}: {v}")
+
+    return result
 
 
+# =========================
+# CODE GENERATION + REPAIR LOOP
+# =========================
+def generate_and_refine_code(llm, arch_path, code_path, max_iters=3):
+
+    generator = CodeGenerator(llm)
+
+    # initial generation
+    generator.generate_from_architecture(arch_path, code_path)
+
+    for i in range(max_iters):
+
+        print(f"\n=== Code analysis iteration {i+1} ===")
+
+        result = analyze_generated_code(arch_path, code_path)
+
+        errors = result.get("errors", [])
+        warnings = result.get("warnings", [])
+
+        if not errors:
+            print("✅ Code passed analysis")
+            return
+
+        print(f"❌ Found {len(errors)} errors, regenerating...")
+
+        try:
+            with open(code_path) as f:
+                code = f.read()
+        except Exception:
+            code = ""
+
+        repair_prompt = build_code_repair_prompt(code, errors, warnings)
+
+        raw_output = llm.generate("", repair_prompt)
+        new_code = extract_code(raw_output)
+
+        with open(code_path, "w") as f:
+            f.write(new_code)
+
+    print("⚠️ Max refinement iterations reached")
+
+
+# =========================
+# ARCHITECTURE GENERATION LOOP
+# =========================
 def generate_architecture_loop(llm, user_prompt, arch_path, max_attempts):
 
     prompt = user_prompt
@@ -114,6 +226,9 @@ def generate_architecture_loop(llm, user_prompt, arch_path, max_attempts):
     raise RuntimeError("Failed to generate any architecture")
 
 
+# =========================
+# MAIN ENTRYPOINT
+# =========================
 def main():
 
     parser = argparse.ArgumentParser(
@@ -131,10 +246,10 @@ def main():
     parser.add_argument("--no-analyze", action="store_true")
 
     parser.add_argument("--from-arch", action="store_true",
-                        help="Skip architecture generation, use existing YAML")
+                        help="Use existing architecture")
 
     parser.add_argument("--analyze-only", action="store_true",
-                        help="Analyze only code (no architecture required)")
+                        help="Analyze only code")
 
     parser.add_argument("--max-attempts", type=int, default=6)
 
@@ -144,19 +259,19 @@ def main():
 
     arch = None
 
-    # === MODE 3: analyze only code ===
+    # === MODE 3: analyze only ===
     if args.analyze_only:
         analyze_generated_code(None, args.code)
         return
 
-    # === MODE 2: use existing architecture ===
+    # === MODE 2: existing architecture ===
     if args.from_arch:
         arch = load_architecture(args.arch)
 
     # === MODE 1: generate architecture ===
     else:
         if not args.prompt:
-            raise ValueError("Prompt is required unless --from-arch or --analyze-only is used")
+            raise ValueError("Prompt required unless using --from-arch or --analyze-only")
 
         arch = generate_architecture_loop(
             llm,
@@ -165,13 +280,12 @@ def main():
             args.max_attempts
         )
 
-    # === code generation ===
+    # === code generation + refinement ===
     if not args.no_code:
-        generator = CodeGenerator(llm)
-        generator.generate_from_architecture(args.arch, args.code)
+        generate_and_refine_code(llm, args.arch, args.code)
 
-    # === analysis ===
-    if not args.no_analyze:
+    # === final analysis ===
+    elif not args.no_analyze:
         analyze_generated_code(args.arch, args.code)
 
 
