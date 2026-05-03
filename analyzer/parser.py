@@ -1,6 +1,14 @@
 import ast
 
 
+def is_valid_python(code: str):
+    try:
+        ast.parse(code)
+        return True, ""
+    except Exception as e:
+        return False, str(e)
+
+
 class CallVisitor(ast.NodeVisitor):
 
     def __init__(self):

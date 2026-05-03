@@ -3,6 +3,7 @@ import ast
 import re
 
 from analyzer.main_pipeline import analyze_code
+from analyzer.parser import is_valid_python
 from architecture.loader import load_architecture
 from verifier.verifier import verify_architecture
 from llm.factory import get_llm
@@ -15,6 +16,10 @@ from utils.yaml_utils import extract_yaml, normalize_yaml
 
 DEFAULT_ARCH_PATH = "sessions/architecture.yaml"
 DEFAULT_CODE_PATH = "sessions/generated_code.py"
+
+
+def flatten_errors(error_map):
+    return sum(error_map.values(), [])
 
 
 # =========================
@@ -43,35 +48,34 @@ def extract_code(text: str) -> str:
 
 
 # =========================
-# SYNTAX CHECK
-# =========================
-def is_valid_python(code: str):
-    try:
-        ast.parse(code)
-        return True, ""
-    except Exception as e:
-        return False, str(e)
-
-
-# =========================
 # ANALYZER WRAPPER (SAFE)
 # =========================
 def analyze_generated_code(arch_path, code_path):
 
     print("\n=== Running Code Analyzer ===")
 
+    # =====================
+    # LOAD CODE
+    # =====================
     try:
         with open(code_path) as f:
             code = f.read()
     except Exception as e:
         print("Failed to read code:", e)
         return {
-            "errors": [f"Failed to read code: {e}"],
+            "errors": {
+                "syntax": [f"Failed to read code: {e}"],
+                "semantic": [],
+                "architecture": []
+            },
             "warnings": [],
             "metrics": {},
             "score": 0
         }
 
+    # =====================
+    # LOAD ARCH (optional)
+    # =====================
     arch = None
     if arch_path is not None:
         try:
@@ -79,14 +83,20 @@ def analyze_generated_code(arch_path, code_path):
         except Exception:
             print("⚠️ Failed to load architecture, continuing without it")
 
-    # ---- SYNTAX CHECK FIRST ----
+    # =====================
+    # SYNTAX CHECK
+    # =====================
     valid, syntax_error = is_valid_python(code)
 
     if not valid:
         print("❌ Syntax error detected")
 
         result = {
-            "errors": [f"Syntax error: {syntax_error}"],
+            "errors": {
+                "syntax": [f"Syntax error: {syntax_error}"],
+                "semantic": [],
+                "architecture": []
+            },
             "warnings": [],
             "metrics": {},
             "score": 0
@@ -95,28 +105,44 @@ def analyze_generated_code(arch_path, code_path):
     else:
         try:
             result = analyze_code(code, arch)
+
         except Exception as e:
             print("Analyzer failed:", e)
 
             result = {
-                "errors": [f"Analyzer error: {e}"],
+                "errors": {
+                    "syntax": [],
+                    "semantic": [f"Analyzer error: {e}"],
+                    "architecture": []
+                },
                 "warnings": [],
                 "metrics": {},
                 "score": 0
             }
 
-    # ---- PRINT RESULT ----
+    # =====================
+    # PRINT RESULT
+    # =====================
     print("\n=== ANALYSIS RESULT ===")
     print("Score:", result.get("score"))
 
+    # ---- ERRORS (structured) ----
     print("\nErrors:")
-    for e in result.get("errors", []):
-        print("-", e)
 
+    error_map = result.get("errors", {})
+
+    for level, errs in error_map.items():
+        if errs:
+            print(f"\n[{level.upper()}]")
+            for e in errs:
+                print("-", e)
+
+    # ---- WARNINGS ----
     print("\nWarnings:")
     for w in result.get("warnings", []):
         print("-", w)
 
+    # ---- METRICS ----
     print("\nMetrics:")
     for k, v in result.get("metrics", {}).items():
         print(f"{k}: {v}")
@@ -140,7 +166,8 @@ def generate_and_refine_code(llm, arch_path, code_path, max_iters=3):
 
         result = analyze_generated_code(arch_path, code_path)
 
-        errors = result.get("errors", [])
+        error_map = result.get("errors", {})
+        errors = flatten_errors(error_map)
         warnings = result.get("warnings", [])
 
         if not errors:
