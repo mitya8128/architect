@@ -4,6 +4,7 @@ import re
 
 from analyzer.main_pipeline import analyze_code
 from analyzer.parser import is_valid_python
+from analyzer.repo_analyzer import analyze_repository
 from architecture.loader import load_architecture
 from verifier.verifier import verify_architecture
 from llm.factory import get_llm
@@ -277,6 +278,9 @@ def main():
 
     parser.add_argument("--analyze-only", action="store_true",
                         help="Analyze only code")
+    
+    parser.add_argument( "--repo", type=str, 
+                        help="Path to repository for multi-file analysis")
 
     parser.add_argument("--max-attempts", type=int, default=6)
 
@@ -285,6 +289,23 @@ def main():
     llm = get_llm(args.provider, args.model)
 
     arch = None
+    
+    # === MODE 4: analyze repository-wide:
+    if args.repo:
+
+        print("\n=== Repository Analysis ===")
+
+        result = analyze_repository(args.repo)
+
+        print("\nErrors:")
+        for e in result["errors"]:
+            print("-", e)
+
+        print("\nMetrics:")
+        for k, v in result["metrics"].items():
+            print(f"{k}: {v}")
+
+        return
 
     # === MODE 3: analyze only ===
     if args.analyze_only:
