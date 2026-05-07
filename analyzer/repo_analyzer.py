@@ -55,20 +55,25 @@ def build_global_call_graph(all_functions, all_calls):
     # build edges
     for file_path, calls in all_calls.items():
 
-        for caller, callees in calls.items():
+        caller_file_index = {}
 
-            caller_key = f"{file_path}::{caller}"
+        for full_name in all_functions:
+            if full_name.startswith(file_path + "::"):
+                short = full_name.split("::")[-1]
+                caller_file_index[short] = full_name
 
-            if caller_key not in graph:
+        # calls is LIST now
+        for caller, callee in calls:
+
+            caller_key = caller_file_index.get(caller)
+
+            if caller_key is None:
                 continue
 
-            for callee in callees:
+            targets = name_index.get(callee, [])
 
-                # match ANY function with that name
-                targets = name_index.get(callee, [])
-
-                for t in targets:
-                    graph[caller_key].append(t)
+            for target in targets:
+                graph[caller_key].append(target)
 
     return graph
 
