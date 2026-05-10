@@ -135,6 +135,9 @@ python main.py --from-arch --no-code --arch arch.yaml --code code.py
 
 # only analyze code:
 python main.py --analyze-only --code app.py
+
+# analyze whole repository (it'll parse and analyz all .py files within):
+python main.py --repo <path to repository>
 ```
 
 This will (a full pipeline):
