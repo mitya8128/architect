@@ -13,6 +13,7 @@ from system_prompt import SYSTEM_PROMPT
 from prompts.rebuild_arch_prompts import build_repair_prompt
 from prompts.rebuild_code_generation_prompts import build_code_repair_prompt
 from utils.yaml_utils import extract_yaml, normalize_yaml
+from utils.code_utils import extract_code
 
 
 DEFAULT_ARCH_PATH = "sessions/architecture.yaml"
@@ -31,21 +32,6 @@ def safe_normalize_yaml(text: str) -> str:
         return normalize_yaml(text)
     except Exception:
         return text
-
-
-# =========================
-# CODE EXTRACTION FROM LLM
-# =========================
-def extract_code(text: str) -> str:
-    fenced = re.findall(r"```python(.*?)```", text, re.DOTALL)
-    if fenced:
-        return fenced[0].strip()
-
-    fenced_any = re.findall(r"```(.*?)```", text, re.DOTALL)
-    if fenced_any:
-        return fenced_any[0].strip()
-
-    return text.strip()
 
 
 # =========================
