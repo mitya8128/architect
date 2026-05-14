@@ -1,30 +1,20 @@
 from architecture.model import SemanticNode,RepositorySemanticModel
 
 
-def compile_semantic_model(arch: dict) -> RepositorySemanticModel:
-
-    system_name = arch["system"]["name"]
+def compile_semantic_model(arch):
+    
     nodes = {}
-    modules = arch.get("modules", {})
+    
+    for module_name, module in arch.modules.items():
+        node = SemanticNode(name=module.name,
+                            role=getattr(module, "role", "service"),
+                            description=getattr(module, "description", ""), 
+                            exports=getattr(module, "exports", []),
+                            depends_on=getattr(module, "depends_on", []), 
+                            constraints=getattr(module, "constraints", []))
 
-    for module_name, module_data in modules.items():
+        nodes[module.name] = node
 
-        node = SemanticNode(
-            name=module_name,
-            role=module_data.get("role", "service"),
-            description=module_data.get("description", ""),
-            exports=module_data.get("exports", []),
-            depends_on=module_data.get("depends_on", []),
-            constraints=module_data.get("constraints", []),
-        )
-
-        nodes[module_name] = node
-
-    return RepositorySemanticModel(
-        system_name=system_name,
-        nodes=nodes,
-        global_constraints=arch.get(
-            "global_constraints",
-            []
-        )
-    )
+    return RepositorySemanticModel(system_name= "", 
+                                   nodes=nodes,
+                                   global_constraints=getattr(arch,"global_constraints",[]))
