@@ -33,11 +33,17 @@ Rules:
 1. Generate ONLY this module.
 2. Do not generate unrelated code.
 3. Use clean Python.
-4. Respect dependency constraints.
-5. Do not import unknown modules.
-6. Export required functions.
+4. Output syntactically valid Python only.
+5. Respect dependency constraints.
+6. Do not import unknown modules.
 7. Keep implementation minimal.
 8. Prefer deterministic logic.
+9. Avoid external frameworks unless explicitly requested.
+10. Avoid placeholders.
+11. Do not output "..."
+12. Do not output pseudo-code.
+13. Prefer standard library only.
+14. Keep implementation minimal.
 
 Output ONLY valid Python code.
 '''
