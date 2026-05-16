@@ -1,60 +1,82 @@
 from llm.services.repository_generator import RepositoryGenerator
 from analyzer.repo_pipeline import analyze_repository_generation
-from verifier.module_verifier import verify_module
-from analyzer.semantic_summary import extract_semantic_summary
-from prompts.module_repair_prompt import build_module_repair_prompt
-from utils.code_utils import extract_code
+from .stages.syntax_stage import check_syntax
+from .stages.semantic_stage import check_semantics
+from .stages.repair_stage import repair_code
 
 
-def generate_and_refine_repository(llm,semantic_model, 
-                                   output_dir,max_iters=3):
+def generate_and_refine_repository(llm, semantic_model, output_dir, max_iters=3):
 
     generator = RepositoryGenerator(llm)
     state = generator.generate_repository(semantic_model, output_dir)
 
     for iteration in range(max_iters):
-        print(
-            f"\\n=== Repository refinement iteration {iteration+1} ==="
-        )
+        print(f"\n=== Repository refinement iteration {iteration+1} ===")
         errors_found = False
 
-        for module_name, module_path in (
-            state.generated_modules.items()
-        ):
-            print(f"\\nChecking module: {module_name}")
+        for module_name, module_path in (state.generated_modules.items()):
+
+            print(f"\nChecking module: {module_name}")
 
             with open(module_path) as f:
                 code = f.read()
 
-            summary = extract_semantic_summary(code)
             node = semantic_model.nodes[module_name]
 
-            errors = verify_module(node, summary)
+            # =====================
+            # SYNTAX STAGE
+            # =====================
+            syntax_result = check_syntax(code)
+            if not syntax_result["valid"]:
+                errors_found = True
+                print("\n[SYNTAX ERRORS]")
+                for e in syntax_result["errors"]:
+                    print("-", e)
 
-            if not errors:
+                repaired_code = repair_code(llm, code, syntax_result["errors"])
+
+                with open(module_path, "w") as f:
+                    f.write(repaired_code)
+
                 continue
 
-            errors_found = True
+            # =====================
+            # SEMANTIC STAGE
+            # =====================
+            semantic_result = check_semantics(node,code)
 
-            print("Errors:")
+            if not semantic_result["valid"]:
+                errors_found = True
+                print("\n[SEMANTIC ERRORS]")
+                for e in semantic_result["errors"]:
+                    print("-", e)
 
-            for e in errors:
-                print("-", e)
+                repaired_code = repair_code(llm, code, semantic_result["errors"])
 
-            repair_prompt = build_module_repair_prompt( code, errors)
+                with open(module_path, "w") as f:
+                    f.write(repaired_code)
 
-            raw_output = llm.generate( "", repair_prompt)
+                continue
 
-            repaired_code = extract_code(raw_output)
-
-            with open(module_path, "w") as f:
-                f.write(repaired_code)
-
+        # =====================
+        # FINAL RESULT
+        # =====================
         if not errors_found:
-            print("\\n✅ Repository passed verification")
+            print(
+                "\n✅ Repository passed verification"
+            )
+            try:
+                result = analyze_repository_generation(output_dir)
+                print("\nRepository Metrics:")
+                for k, v in result.get("metrics", {}).items():
+                    print(f"{k}: {v}")
+
+            except Exception as e:
+                print("\n⚠️ Repository analysis failed:")
+                print(e)
 
             return state
 
-    print("\\n⚠️ Max repository refinement iterations reached")
+    print("\n⚠️ Max repository refinement iterations reached")
 
     return state
